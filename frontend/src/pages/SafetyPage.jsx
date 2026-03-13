@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
 import {
   Shield,
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Ship,
   Activity
 } from "lucide-react"
+import api from "../api/axios"
 
 export default function SafetyPage() {
 
@@ -63,6 +64,26 @@ export default function SafetyPage() {
       time: "1 hr ago"
     }
   ]
+
+  const [riskAlerts, setRiskAlerts] = useState([])
+  const [loadingAlerts, setLoadingAlerts] = useState(false)
+
+  useEffect(() => {
+
+    setLoadingAlerts(true)
+
+    api.get("vessels/safety/alerts/")
+      .then((res) => {
+        setRiskAlerts(Array.isArray(res.data) ? res.data : [])
+      })
+      .catch((err) => {
+        console.error("Failed to load live safety alerts from backend", err)
+      })
+      .finally(() => {
+        setLoadingAlerts(false)
+      })
+
+  }, [])
 
   const getSeverityColor = (severity) => {
     if (severity === "High") return "text-red-600 bg-red-100"
@@ -172,6 +193,51 @@ export default function SafetyPage() {
           </table>
 
         </div>
+
+      </div>
+
+      {/* Live backend-driven risk alerts */}
+      <div className="bg-white shadow rounded-xl p-6">
+
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Activity size={20} />
+          Live Risk Alerts (Backend)
+        </h2>
+
+        {loadingAlerts && (
+          <p className="text-gray-500 text-sm">
+            Loading alerts from backend...
+          </p>
+        )}
+
+        {!loadingAlerts && riskAlerts.length === 0 && (
+          <p className="text-gray-500 text-sm">
+            No active risk alerts from backend.
+          </p>
+        )}
+
+        {!loadingAlerts && riskAlerts.length > 0 && (
+          <ul className="space-y-2">
+            {riskAlerts.map((alert, idx) => (
+              <li
+                key={idx}
+                className="flex items-start justify-between border rounded-lg px-3 py-2 bg-slate-50"
+              >
+                <div>
+                  <p className="font-semibold">
+                    Vessel: {alert.vessel}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Risk: {alert.risk || alert.zone}
+                  </p>
+                </div>
+                <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
+                  {alert.severity || "High"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
       </div>
 

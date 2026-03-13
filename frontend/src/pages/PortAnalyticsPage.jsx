@@ -1,17 +1,18 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ArrivalsDepartures from "../components/ports/ArrivalsDepartures";
 import CongestionChart from "../components/ports/CongestionChart";
+import api from "../api/axios";
 
 export default function PortAnalyticsPage() {
 
-  const analytics = {
+  const defaultSummary = {
     totalPorts: 12,
     activePorts: 9,
     totalArrivals: 128,
     totalDepartures: 121,
   };
 
-  const weeklyData = [
+  const defaultWeeklyData = [
     { date: "Mon", arrivals: 20, departures: 18 },
     { date: "Tue", arrivals: 25, departures: 22 },
     { date: "Wed", arrivals: 18, departures: 15 },
@@ -19,13 +20,66 @@ export default function PortAnalyticsPage() {
     { date: "Fri", arrivals: 30, departures: 28 },
   ];
 
-  const congestionData = [
+  const defaultCongestionData = [
     { port: "Mumbai", congestionScore: 85 },
     { port: "Chennai", congestionScore: 60 },
     { port: "Kolkata", congestionScore: 45 },
     { port: "Kochi", congestionScore: 30 },
     { port: "Vizag", congestionScore: 20 },
   ];
+
+  const [summary, setSummary] = useState(defaultSummary);
+  const [weeklyData, setWeeklyData] = useState(defaultWeeklyData);
+  const [congestionData, setCongestionData] = useState(defaultCongestionData);
+
+  useEffect(() => {
+
+    api
+      .get("vessels/ports/analytics/")
+      .then((res) => {
+        const data = Array.isArray(res.data) ? res.data : [];
+
+        if (!data.length) return;
+
+        const totalArrivals = data.reduce(
+          (sum, port) => sum + (port.arrivals || 0),
+          0
+        );
+
+        const totalDepartures = data.reduce(
+          (sum, port) => sum + (port.departures || 0),
+          0
+        );
+
+        setSummary({
+          totalPorts: data.length,
+          activePorts: data.length,
+          totalArrivals,
+          totalDepartures,
+        });
+
+        setWeeklyData(
+          data.map((port) => ({
+            date: port.port,
+            arrivals: port.arrivals,
+            departures: port.departures,
+          }))
+        );
+
+        setCongestionData(
+          data.map((port) => ({
+            port: port.port,
+            congestionScore: Math.round(
+              (port.congestion_score ?? port.congestionScore ?? 0) * 100
+            ),
+          }))
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to load port analytics from backend", err);
+      });
+
+  }, []);
 
   return (
     <div className="p-6 bg-slate-100 min-h-screen">
@@ -40,28 +94,28 @@ export default function PortAnalyticsPage() {
         <div className="bg-white p-5 rounded-xl shadow border-l-4 border-blue-500">
           <h3 className="text-gray-500 text-sm">Total Ports</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {analytics.totalPorts}
+            {summary.totalPorts}
           </p>
         </div>
 
         <div className="bg-white p-5 rounded-xl shadow border-l-4 border-green-500">
           <h3 className="text-gray-500 text-sm">Active Ports</h3>
           <p className="text-2xl font-bold text-green-600">
-            {analytics.activePorts}
+            {summary.activePorts}
           </p>
         </div>
 
         <div className="bg-white p-5 rounded-xl shadow border-l-4 border-purple-500">
           <h3 className="text-gray-500 text-sm">Total Arrivals</h3>
           <p className="text-2xl font-bold text-purple-600">
-            {analytics.totalArrivals}
+            {summary.totalArrivals}
           </p>
         </div>
 
         <div className="bg-white p-5 rounded-xl shadow border-l-4 border-red-500">
           <h3 className="text-gray-500 text-sm">Total Departures</h3>
           <p className="text-2xl font-bold text-red-600">
-            {analytics.totalDepartures}
+            {summary.totalDepartures}
           </p>
         </div>
 
