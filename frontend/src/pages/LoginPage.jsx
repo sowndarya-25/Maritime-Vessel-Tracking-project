@@ -2,22 +2,10 @@ import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useDispatch } from "react-redux"
-import { loginSuccess } from "../stores/slices/authSlice"
+import { loginStart, loginSuccess, loginFailure } from "../stores/slices/authSlice"
 import ReCAPTCHA from "react-google-recaptcha"
-import axios from "axios"
-
-const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-})
-
-// Attach JWT token automatically
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token")
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
+import api from "../api/axios"
+import authService from "../services/authService"
 
 export default function LoginPage() {
 
@@ -57,12 +45,10 @@ export default function LoginPage() {
   }
 
   // ================= LOGIN / SIGNUP =================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
     setMessage("")
-
-    const users = JSON.parse(localStorage.getItem("users")) || []
 
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters")
@@ -72,38 +58,30 @@ export default function LoginPage() {
     // ================= SIGNUP =================
     if (isSignup) {
 
-      if (!form.username) {
-        setError("Username is required")
-        return
-      }
-
       if (form.password !== form.confirmPassword) {
         setError("Passwords do not match")
         return
       }
 
-      const userExists = users.find(u => u.email === form.email)
+      try {
+        // Use email as username in backend
+        await api.post("auth/register/", {
+          username: form.email,
+          password: form.password,
+          role: form.role
+        })
 
-      if (userExists) {
-        setError("User already exists")
+        setMessage("Signup successful. You can now sign in.")
+        setIsSignup(false)
+        return
+
+      } catch (err) {
+        setError(
+          err.response?.data?.detail ||
+          "Signup failed. Please try again."
+        )
         return
       }
-
-      const newUser = {
-        id: Date.now(),
-        username: form.username,
-        email: form.email,
-        password: form.password,
-        role: form.role,
-        created_at: new Date().toISOString()
-      }
-
-      users.push(newUser)
-      localStorage.setItem("users", JSON.stringify(users))
-
-      setMessage("Signup Successful ✅")
-      setIsSignup(false)
-      return
     }
 
     // ================= CAPTCHA CHECK =================
@@ -113,25 +91,47 @@ export default function LoginPage() {
     }
 
     // ================= LOGIN =================
-    const user = users.find(
-      u => u.email === form.email && u.password === form.password
-    )
+    try {
+      dispatch(loginStart())
 
-    if (!user) {
-      setError("Invalid email or password")
-      return
+      // Backend expects username; we use email as username
+      const loginResponse = await api.post("auth/login/", {
+        username: form.email,
+        password: form.password
+      })
+
+      const { access, refresh } = loginResponse.data
+
+      // Persist tokens
+      localStorage.setItem("access_token", access)
+      localStorage.setItem("refresh_token", refresh)
+
+      // Fetch profile from backend
+      const user = await authService.getProfile()
+
+      dispatch(
+        loginSuccess({
+          user,
+          token: access
+        })
+      )
+
+      navigate("/dashboard")
+
+    } catch (err) {
+      dispatch(
+        loginFailure(
+          err.response?.data?.error ||
+          err.response?.data?.detail ||
+          "Login failed"
+        )
+      )
+
+      setError(
+        err.response?.data?.error ||
+        "Invalid email or password"
+      )
     }
-
-    const fakeToken = "local-auth-token-123"
-
-dispatch(loginSuccess({
-  user: user,
-  token: fakeToken
-}))
-
-localStorage.setItem("token", fakeToken)
-
-navigate("/dashboard")
   }
 
   // ================= FORGOT PASSWORD =================

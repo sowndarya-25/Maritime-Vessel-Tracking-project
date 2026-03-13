@@ -1,19 +1,5 @@
 import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
-import "leaflet/dist/leaflet.css"
-import L from "leaflet"
-
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png"
-import markerIcon from "leaflet/dist/images/marker-icon.png"
-import markerShadow from "leaflet/dist/images/marker-shadow.png"
-
-delete L.Icon.Default.prototype._getIconUrl
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-})
 
 export default function VesselMap() {
 
@@ -73,12 +59,13 @@ export default function VesselMap() {
 
   return (
 
-    <div className="h-125 w-full rounded-lg shadow">
+    <div className="w-full h-full min-h-[520px] rounded-lg shadow overflow-hidden">
 
       <MapContainer
         center={[20.5937, 78.9629]}
         zoom={5}
-        className="h-full w-full"
+        className="w-full h-full"
+        style={{ width: "100%", height: "100%", minHeight: 520 }}
       >
 
         <TileLayer

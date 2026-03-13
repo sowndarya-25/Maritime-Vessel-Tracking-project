@@ -44,6 +44,13 @@ export default function Sidebar() {
     },
 
     {
+      to: "/vessels",
+      icon: <Ship size={18} />,
+      label: "Vessels",
+      roles: ["admin", "operator", "viewer"]
+    },
+
+    {
       to: "/users",
       icon: <Users size={18} />,
       label: "Users",

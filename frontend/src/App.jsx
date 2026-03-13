@@ -10,6 +10,7 @@ import HomePage from "./pages/HomePage"
 import DashboardPage from "./pages/DashboardPage"
 import AdminPage from "./pages/AdminPage"
 import UsersPage from "./pages/UsersPage"
+import VesselsPage from "./pages/VesselsPage"
 import ProfilePage from "./pages/ProfilePage"
 import ReportPage from "./pages/ReportPage"
 import SafetyPage from "./pages/SafetyPage"
@@ -143,6 +144,17 @@ export default function App() {
             <PrivateRoute>
               <MainLayout>
                 <SettingsPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/vessels"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <VesselsPage />
               </MainLayout>
             </PrivateRoute>
           }
