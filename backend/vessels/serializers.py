@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Vessel, VesselEvent, Notification
+from .models import Vessel, VesselEvent, Notification, SafetyZone
 
 
 class VesselSerializer(serializers.ModelSerializer):
@@ -20,4 +20,11 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
+        fields = "__all__"
+
+
+class SafetyZoneSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SafetyZone
         fields = "__all__"

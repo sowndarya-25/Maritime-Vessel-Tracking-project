@@ -1,18 +1,21 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { useDispatch, useSelector } from "react-redux"
 import { Bell, User, LogOut, Home } from "lucide-react"
+import { logout } from "../../stores/slices/authSlice"
 
 export default function Navigation() {
   const location = useLocation()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const user = useSelector((state) => state.auth?.user)
   const [open, setOpen] = useState(false)
 
-  // Dynamic page title
   const getTitle = () => {
     switch (location.pathname) {
       case "/dashboard":
         return "Dashboard"
-        case "/home":
+      case "/home":
         return "Home"
       case "/admin":
         return "Admin Panel"
@@ -20,17 +23,32 @@ export default function Navigation() {
         return "Live Tracking"
       case "/vessels":
         return "Vessels"
+      case "/notifications":
+        return "Notifications"
       case "/alerts":
         return "Alerts"
       case "/analytics":
-        return "Analytics"
+        return "Port Analytics"
+      case "/safety":
+        return "Safety Zones"
+      case "/voyages":
+        return "Voyage History"
+      case "/profile":
+        return "Profile"
+      case "/reports":
+        return "Reports"
+      case "/settings":
+        return "Settings"
       default:
-        return "Maritime Admin"
+        return "Maritime Platform"
     }
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("token")
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
+    localStorage.removeItem("user")
+    dispatch(logout())
     navigate("/")
   }
 
@@ -55,15 +73,12 @@ export default function Navigation() {
 
         {/* Notification Icon */}
 <div
-  onClick={() => navigate("/alerts")}
+  onClick={() => navigate("/notifications")}
   className="relative cursor-pointer p-2 rounded-full hover:bg-blue-100"
-  title="Alerts"
+  title="Notifications"
 >
   <Bell size={20} className="text-gray-600 hover:text-blue-600" />
-  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 rounded-full">
-    
-  </span>
-</div>
+  </div>
 
         {/* Profile */}
         <div
@@ -73,7 +88,7 @@ export default function Navigation() {
           <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center">
             <User size={16} />
           </div>
-          <span className="text-sm text-gray-700">Admin</span>
+          <span className="text-sm text-gray-700">{user?.username || "User"}</span>
         </div>
 
         {/* Dropdown */}

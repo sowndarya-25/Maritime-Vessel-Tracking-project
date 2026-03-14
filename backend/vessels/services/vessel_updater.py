@@ -10,12 +10,13 @@ def update_vessels():
         # Create demo vessels first time
         for i in range(5):
             Vessel.objects.create(
+                mmsi=f"10000{i}",
                 imo_number=f"IMO100{i}",
-                name=f"Demo Vessel {i}",
+                vessel_name=f"Demo Vessel {i}",
                 latitude=20 + i,
                 longitude=70 + i,
-                speed=random.randint(0, 20),
-                course=random.randint(0, 360),
+                speed=random.uniform(0, 20),
+                course=random.uniform(0, 360),
                 vessel_type="Cargo"
             )
         return

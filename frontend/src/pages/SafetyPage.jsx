@@ -4,86 +4,71 @@ import {
   AlertTriangle,
   CheckCircle,
   Ship,
-  Activity
+  Activity,
+  MapPin,
 } from "lucide-react"
-import api from "../api/axios"
+import vesselService from "../services/vesselService"
 
 export default function SafetyPage() {
+  const [zones, setZones] = useState([])
+  const [alerts, setAlerts] = useState([])
+  const [vessels, setVessels] = useState([])
+  const [loadingZones, setLoadingZones] = useState(true)
+  const [loadingAlerts, setLoadingAlerts] = useState(true)
 
-  // Dummy safety data (replace later with API)
+  useEffect(() => {
+    vesselService
+      .getSafetyZones()
+      .then((r) => setZones(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setZones([]))
+      .finally(() => setLoadingZones(false))
+  }, [])
+
+  useEffect(() => {
+    setLoadingAlerts(true)
+    Promise.all([
+      vesselService.getSafetyAlerts().then((r) => r.data).catch(() => []),
+      vesselService.getVessels().then((r) => r.data).catch(() => []),
+    ])
+      .then(([alertsData, vesselsData]) => {
+        setAlerts(Array.isArray(alertsData) ? alertsData : [])
+        setVessels(Array.isArray(vesselsData) ? vesselsData : [])
+      })
+      .finally(() => setLoadingAlerts(false))
+  }, [])
+
+  const dangerSet = new Set(alerts.map((a) => (a.vessel || "").toLowerCase()))
+  const dangerCount = vessels.filter((v) =>
+    dangerSet.has((v.vessel_name || "").toLowerCase())
+  ).length
+  const safeCount = Math.max(0, vessels.length - dangerCount)
+
   const safetyStats = [
     {
       title: "Total Vessels Monitored",
-      value: "128",
+      value: vessels.length,
       icon: Ship,
-      color: "bg-blue-500"
+      color: "bg-blue-500",
     },
     {
       title: "Active Alerts",
-      value: "6",
+      value: alerts.length,
       icon: AlertTriangle,
-      color: "bg-red-500"
+      color: "bg-red-500",
     },
     {
       title: "Safe Vessels",
-      value: "110",
+      value: safeCount,
       icon: CheckCircle,
-      color: "bg-green-500"
+      color: "bg-green-500",
     },
     {
-      title: "Risk Level",
-      value: "Moderate",
+      title: "Vessels in Danger",
+      value: dangerCount,
       icon: Shield,
-      color: "bg-yellow-500"
-    }
-  ]
-
-  const alerts = [
-    {
-      id: 1,
-      vessel: "MV Ocean Star",
-      type: "Speed Violation",
-      location: "Chennai Port",
-      severity: "High",
-      time: "10 min ago"
+      color: "bg-amber-500",
     },
-    {
-      id: 2,
-      vessel: "MT Blue Whale",
-      type: "Restricted Area Entry",
-      location: "Mumbai Port",
-      severity: "Medium",
-      time: "25 min ago"
-    },
-    {
-      id: 3,
-      vessel: "MV Sea Explorer",
-      type: "Signal Lost",
-      location: "Kolkata Port",
-      severity: "Low",
-      time: "1 hr ago"
-    }
   ]
-
-  const [riskAlerts, setRiskAlerts] = useState([])
-  const [loadingAlerts, setLoadingAlerts] = useState(false)
-
-  useEffect(() => {
-
-    setLoadingAlerts(true)
-
-    api.get("vessels/safety/alerts/")
-      .then((res) => {
-        setRiskAlerts(Array.isArray(res.data) ? res.data : [])
-      })
-      .catch((err) => {
-        console.error("Failed to load live safety alerts from backend", err)
-      })
-      .finally(() => {
-        setLoadingAlerts(false)
-      })
-
-  }, [])
 
   const getSeverityColor = (severity) => {
     if (severity === "High") return "text-red-600 bg-red-100"
@@ -93,154 +78,106 @@ export default function SafetyPage() {
 
   return (
     <div className="p-6 space-y-6">
-
-      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">
-          Safety Monitoring
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-800">Safety Monitoring</h1>
         <p className="text-gray-500">
-          Monitor vessel safety, alerts, and risk levels
+          Monitor vessel safety, alerts, and risk zones
         </p>
       </div>
 
-      {/* Safety Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
         {safetyStats.map((stat, index) => {
           const Icon = stat.icon
-
           return (
             <div
               key={index}
               className="bg-white rounded-xl shadow p-5 flex items-center justify-between"
             >
               <div>
-                <p className="text-gray-500 text-sm">
-                  {stat.title}
-                </p>
-
-                <h2 className="text-xl font-bold mt-1">
-                  {stat.value}
-                </h2>
+                <p className="text-gray-500 text-sm">{stat.title}</p>
+                <h2 className="text-xl font-bold mt-1">{stat.value}</h2>
               </div>
-
               <div className={`${stat.color} p-3 rounded-lg`}>
                 <Icon className="text-white" size={22} />
               </div>
             </div>
           )
         })}
-
       </div>
 
-      {/* Alerts Table */}
+      {/* Safety Zones List */}
       <div className="bg-white shadow rounded-xl p-6">
-
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Activity size={20} />
-          Recent Safety Alerts
+          <MapPin size={20} />
+          Safety Zones
         </h2>
-
-        <div className="overflow-x-auto">
-
-          <table className="w-full text-left">
-
-            <thead>
-              <tr className="border-b text-gray-600 text-sm">
-                <th className="py-3">Vessel</th>
-                <th>Alert Type</th>
-                <th>Location</th>
-                <th>Severity</th>
-                <th>Time</th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              {alerts.map((alert) => (
-                <tr key={alert.id} className="border-b hover:bg-gray-50">
-
-                  <td className="py-3 font-medium">
-                    {alert.vessel}
-                  </td>
-
-                  <td>
-                    {alert.type}
-                  </td>
-
-                  <td>
-                    {alert.location}
-                  </td>
-
-                  <td>
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(alert.severity)}`}
-                    >
-                      {alert.severity}
-                    </span>
-                  </td>
-
-                  <td className="text-gray-500 text-sm">
-                    {alert.time}
-                  </td>
-
+        {loadingZones && (
+          <p className="text-gray-500 text-sm">Loading zones…</p>
+        )}
+        {!loadingZones && zones.length === 0 && (
+          <p className="text-gray-500 text-sm">No safety zones configured.</p>
+        )}
+        {!loadingZones && zones.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b text-gray-600 text-sm">
+                  <th className="py-3">Name</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                  <th>Radius (km)</th>
                 </tr>
-              ))}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
+              </thead>
+              <tbody>
+                {zones.map((zone) => (
+                  <tr key={zone.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 font-medium">{zone.name}</td>
+                    <td>{zone.latitude}</td>
+                    <td>{zone.longitude}</td>
+                    <td>{zone.radius_km}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Live backend-driven risk alerts */}
+      {/* Live Risk Alerts */}
       <div className="bg-white shadow rounded-xl p-6">
-
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Activity size={20} />
-          Live Risk Alerts (Backend)
+          Live Risk Alerts
         </h2>
-
         {loadingAlerts && (
-          <p className="text-gray-500 text-sm">
-            Loading alerts from backend...
-          </p>
+          <p className="text-gray-500 text-sm">Loading alerts…</p>
         )}
-
-        {!loadingAlerts && riskAlerts.length === 0 && (
-          <p className="text-gray-500 text-sm">
-            No active risk alerts from backend.
-          </p>
+        {!loadingAlerts && alerts.length === 0 && (
+          <p className="text-gray-500 text-sm">No active risk alerts.</p>
         )}
-
-        {!loadingAlerts && riskAlerts.length > 0 && (
+        {!loadingAlerts && alerts.length > 0 && (
           <ul className="space-y-2">
-            {riskAlerts.map((alert, idx) => (
+            {alerts.map((alert, idx) => (
               <li
                 key={idx}
                 className="flex items-start justify-between border rounded-lg px-3 py-2 bg-slate-50"
               >
                 <div>
-                  <p className="font-semibold">
-                    Vessel: {alert.vessel}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Risk: {alert.risk || alert.zone}
-                  </p>
+                  <p className="font-semibold">Vessel: {alert.vessel}</p>
+                  <p className="text-sm text-gray-600">Risk: {alert.risk || alert.zone}</p>
                 </div>
-                <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(
+                    alert.severity || "High"
+                  )}`}
+                >
                   {alert.severity || "High"}
                 </span>
               </li>
             ))}
           </ul>
         )}
-
       </div>
-
     </div>
   )
 }

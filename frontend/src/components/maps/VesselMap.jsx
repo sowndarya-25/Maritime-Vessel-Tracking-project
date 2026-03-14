@@ -1,116 +1,95 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { MapContainer, TileLayer, Marker, Popup, Circle, LayerGroup } from "react-leaflet"
-import api from "../../api/axios"
+import L from "leaflet"
+import vesselService from "../../services/vesselService"
+
+const POLL_INTERVAL_MS = 30000
+
+function createIcon(color) {
+  return L.divIcon({
+    className: "vessel-marker",
+    html: `<div style="
+      width: 20px; height: 20px; border-radius: 50%;
+      background-color: ${color}; border: 2px solid #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    "></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  })
+}
+
+const greenIcon = createIcon("#22c55e")
+const redIcon = createIcon("#ef4444")
 
 export default function VesselMap() {
-
-  // Initial vessel positions (India)
-  const [vessels, setVessels] = useState([
-    {
-      id: 1,
-      name: "Mumbai Vessel",
-      lat: 19.0760,
-      lng: 72.8777,
-      speed: 0.02
-    },
-    {
-      id: 2,
-      name: "Chennai Vessel",
-      lat: 13.0827,
-      lng: 80.2707,
-      speed: 0.015
-    },
-    {
-      id: 3,
-      name: "Kolkata Vessel",
-      lat: 22.5726,
-      lng: 88.3639,
-      speed: 0.01
-    },
-    {
-      id: 4,
-      name: "Kochi Vessel",
-      lat: 9.9312,
-      lng: 76.2673,
-      speed: 0.018
-    }
-  ])
-
+  const [vessels, setVessels] = useState([])
   const [safetyZones, setSafetyZones] = useState([])
+  const [safetyAlerts, setSafetyAlerts] = useState([])
   const [showStormZones, setShowStormZones] = useState(true)
   const [showPiracyZones, setShowPiracyZones] = useState(true)
   const [showAccidentZones, setShowAccidentZones] = useState(true)
+  const [loading, setLoading] = useState(true)
 
-  // Animate vessels every second
-  useEffect(() => {
+  const dangerSet = useMemo(() => {
+    const names = new Set(
+      (Array.isArray(safetyAlerts) ? safetyAlerts : [])
+        .map((a) => (a.vessel || "").toLowerCase())
+        .filter(Boolean)
+    )
+    return names
+  }, [safetyAlerts])
 
-    const interval = setInterval(() => {
-
-      setVessels(prev =>
-        prev.map(vessel => ({
-
-          ...vessel,
-
-          lat: vessel.lat + (Math.random() - 0.5) * vessel.speed,
-          lng: vessel.lng + (Math.random() - 0.5) * vessel.speed
-
-        }))
-      )
-
-    }, 1000)
-
-    return () => clearInterval(interval)
-
-  }, [])
-
-  // Fetch safety zones from backend (or fall back to defaults)
-  useEffect(() => {
-
-    api.get("vessels/safety/alerts/")
-      .then(() => {
-        // In this milestone we simulate zones on frontend;
-        // backend call above validates connectivity.
+  const fetchData = () => {
+    Promise.all([
+      vesselService.getVessels().then((r) => r.data),
+      vesselService.getSafetyZones().then((r) => r.data).catch(() => []),
+      vesselService.getSafetyAlerts().then((r) => r.data).catch(() => []),
+    ])
+      .then(([vesselList, zones, alerts]) => {
+        setVessels(Array.isArray(vesselList) ? vesselList : [])
+        setSafetyZones(Array.isArray(zones) ? zones : [])
+        setSafetyAlerts(Array.isArray(alerts) ? alerts : [])
       })
       .catch((err) => {
-        console.error("Safety alerts endpoint not reachable yet", err)
+        console.error("VesselMap fetch error", err)
+        setVessels([])
+        setSafetyZones([])
+        setSafetyAlerts([])
       })
+      .finally(() => setLoading(false))
+  }
 
-    // Static example zones for map overlays
-    setSafetyZones([
-      {
-        id: 1,
-        type: "Storm",
-        lat: 18.4,
-        lon: 72.2,
-        radiusKm: 200,
-        severity: "High"
-      },
-      {
-        id: 2,
-        type: "Piracy",
-        lat: 15.5,
-        lon: 70.0,
-        radiusKm: 150,
-        severity: "Medium"
-      },
-      {
-        id: 3,
-        type: "Accident",
-        lat: 13.5,
-        lon: 80.5,
-        radiusKm: 100,
-        severity: "Low"
-      }
-    ])
-
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
   }, [])
 
+  const zonesWithType = useMemo(() => {
+    return safetyZones.map((z) => ({
+      ...z,
+      lat: z.latitude ?? z.lat,
+      lon: z.longitude ?? z.lon,
+      radiusKm: z.radius_km ?? z.radiusKm ?? 100,
+      type: z.name?.toLowerCase().includes("storm")
+        ? "Storm"
+        : z.name?.toLowerCase().includes("piracy")
+          ? "Piracy"
+          : "Accident",
+    }))
+  }, [safetyZones])
+
+  if (loading && vessels.length === 0) {
+    return (
+      <div className="w-full h-full min-h-[520px] rounded-lg bg-slate-100 flex items-center justify-center">
+        <p className="text-slate-600">Loading map and vessels…</p>
+      </div>
+    )
+  }
+
   return (
-
     <div className="w-full h-full min-h-[520px] rounded-lg shadow overflow-hidden">
-
-      {/* Overlay controls */}
-      <div className="bg-white/90 p-3 flex gap-4 text-sm rounded-t-lg border-b border-gray-200">
+      <div className="bg-white/90 p-3 flex flex-wrap gap-4 text-sm rounded-t-lg border-b border-gray-200">
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -139,127 +118,106 @@ export default function VesselMap() {
 
       <MapContainer
         center={[20.5937, 78.9629]}
-        zoom={5}
+        zoom={4}
         className="w-full h-full"
-        style={{ width: "100%", height: "100%", minHeight: 520 }}
+        style={{ width: "100%", height: "100%", minHeight: 480 }}
       >
-
         <TileLayer
           attribution="© OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Safety overlays */}
         <LayerGroup>
-          {safetyZones
-            .filter(
-              (z) =>
-                z.type === "Storm" &&
-                showStormZones
-            )
-            .map((zone) => (
+          {zonesWithType
+            .filter((z) => z.type === "Storm" && showStormZones)
+            .map((z, i) => (
               <Circle
-                key={zone.id}
-                center={[zone.lat, zone.lon]}
-                radius={zone.radiusKm * 1000}
-                pathOptions={{ color: "red", fillOpacity: 0.2 }}
+                key={`storm-${z.id ?? i}`}
+                center={[z.lat, z.lon]}
+                radius={(z.radiusKm || 100) * 1000}
+                pathOptions={{ color: "red", fillColor: "red", fillOpacity: 0.2 }}
               >
                 <Popup>
                   <div>
-                    <h3 className="font-bold text-red-600">
-                      Storm Zone
-                    </h3>
-                    <p>Severity: {zone.severity}</p>
-                    <p>Radius: {zone.radiusKm} km</p>
+                    <h3 className="font-bold text-red-600">Storm Zone</h3>
+                    <p>{z.name}</p>
+                    <p>Radius: {z.radiusKm} km</p>
                   </div>
                 </Popup>
               </Circle>
             ))}
-
-          {safetyZones
-            .filter(
-              (z) =>
-                z.type === "Piracy" &&
-                showPiracyZones
-            )
-            .map((zone) => (
+          {zonesWithType
+            .filter((z) => z.type === "Piracy" && showPiracyZones)
+            .map((z, i) => (
               <Circle
-                key={zone.id}
-                center={[zone.lat, zone.lon]}
-                radius={zone.radiusKm * 1000}
-                pathOptions={{ color: "gold", fillOpacity: 0.15 }}
+                key={`piracy-${z.id ?? i}`}
+                center={[z.lat, z.lon]}
+                radius={(z.radiusKm || 100) * 1000}
+                pathOptions={{ color: "gold", fillColor: "gold", fillOpacity: 0.15 }}
               >
                 <Popup>
                   <div>
-                    <h3 className="font-bold text-yellow-600">
-                      Piracy Risk Zone
-                    </h3>
-                    <p>Severity: {zone.severity}</p>
-                    <p>Radius: {zone.radiusKm} km</p>
+                    <h3 className="font-bold text-yellow-600">Piracy Risk Zone</h3>
+                    <p>{z.name}</p>
+                    <p>Radius: {z.radiusKm} km</p>
                   </div>
                 </Popup>
               </Circle>
             ))}
-
-          {safetyZones
-            .filter(
-              (z) =>
-                z.type === "Accident" &&
-                showAccidentZones
-            )
-            .map((zone) => (
+          {zonesWithType
+            .filter((z) => z.type === "Accident" && showAccidentZones)
+            .map((z, i) => (
               <Circle
-                key={zone.id}
-                center={[zone.lat, zone.lon]}
-                radius={zone.radiusKm * 1000}
-                pathOptions={{ color: "orange", fillOpacity: 0.15 }}
+                key={`accident-${z.id ?? i}`}
+                center={[z.lat, z.lon]}
+                radius={(z.radiusKm || 100) * 1000}
+                pathOptions={{ color: "orange", fillColor: "orange", fillOpacity: 0.15 }}
               >
                 <Popup>
                   <div>
-                    <h3 className="font-bold text-orange-600">
-                      Accident Area
-                    </h3>
-                    <p>Severity: {zone.severity}</p>
-                    <p>Radius: {zone.radiusKm} km</p>
+                    <h3 className="font-bold text-orange-600">Accident Area</h3>
+                    <p>{z.name}</p>
+                    <p>Radius: {z.radiusKm} km</p>
                   </div>
                 </Popup>
               </Circle>
             ))}
         </LayerGroup>
 
-        {vessels.map(vessel => (
-
-          <Marker
-            key={vessel.id}
-            position={[vessel.lat, vessel.lng]}
-          >
-
-            <Popup>
-
-              <div>
-                <h3 className="font-bold text-blue-600">
-                  🚢 {vessel.name}
-                </h3>
-
-                <p>Latitude: {vessel.lat.toFixed(4)}</p>
-                <p>Longitude: {vessel.lng.toFixed(4)}</p>
-
-                <p className="text-green-600 font-semibold">
-                  ● Moving
-                </p>
-
-              </div>
-
-            </Popup>
-
-          </Marker>
-
-        ))}
-
+        {vessels
+          .filter((v) => v.latitude != null && v.longitude != null)
+          .map((vessel) => {
+            const name = (vessel.vessel_name || vessel.name || "").toLowerCase()
+            const isDanger = name && dangerSet.has(name)
+            return (
+              <Marker
+                key={vessel.id ?? vessel.mmsi}
+                position={[vessel.latitude, vessel.longitude]}
+                icon={isDanger ? redIcon : greenIcon}
+              >
+                <Popup>
+                  <div>
+                    <h3 className="font-bold text-slate-800">
+                      {vessel.vessel_name || vessel.name || "Vessel"}
+                    </h3>
+                    <p>MMSI: {vessel.mmsi ?? "—"}</p>
+                    <p>IMO: {vessel.imo_number ?? "—"}</p>
+                    <p>Lat: {Number(vessel.latitude).toFixed(4)}</p>
+                    <p>Lon: {Number(vessel.longitude).toFixed(4)}</p>
+                    <p>Speed: {vessel.speed != null ? vessel.speed : "—"} kn</p>
+                    <p
+                      className={
+                        isDanger ? "text-red-600 font-semibold" : "text-green-600 font-semibold"
+                      }
+                    >
+                      ● {isDanger ? "DANGER" : "SAFE"}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
       </MapContainer>
-
     </div>
-
   )
-
 }

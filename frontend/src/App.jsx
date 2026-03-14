@@ -17,6 +17,7 @@ import SafetyPage from "./pages/SafetyPage"
 import SettingsPage from "./pages/SettingsPage"
 import VoyageHistoryPage from "./pages/VoyageHistoryPage"
 import PortAnalyticsPage from "./pages/PortAnalyticsPage"
+import NotificationsPage from "./pages/NotificationsPage"
 import PortDetail from "./components/ports/PortDetail"
 import NotFoundPage from "./pages/NotFoundPage"
 
@@ -177,6 +178,17 @@ export default function App() {
             <PrivateRoute>
               <MainLayout>
                 <SafetyPage />
+              </MainLayout>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/notifications"
+          element={
+            <PrivateRoute>
+              <MainLayout>
+                <NotificationsPage />
               </MainLayout>
             </PrivateRoute>
           }

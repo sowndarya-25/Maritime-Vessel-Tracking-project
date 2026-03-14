@@ -31,7 +31,7 @@ def detect_zone_violations():
 
             if distance <= zone.radius_km:
                 alerts.append({
-                    "vessel": vessel.name,
+                    "vessel": vessel.vessel_name,
                     "zone": zone.name,
                     "distance": round(distance, 2)
                 })

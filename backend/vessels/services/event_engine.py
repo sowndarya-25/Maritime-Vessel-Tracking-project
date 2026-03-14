@@ -6,7 +6,7 @@ def detect_events(vessel):
         event = VesselEvent.objects.create(
             vessel=vessel,
             event_type="STOPPED",
-            description=f"{vessel.name} has stopped."
+            description=f"{vessel.vessel_name} has stopped."
         )
 
         subscribers = VesselSubscription.objects.filter(vessel=vessel)
@@ -14,6 +14,6 @@ def detect_events(vessel):
         for sub in subscribers:
             Notification.objects.create(
                 user=sub.user,
-                vessel=vessel,
-                message=f"Alert: {vessel.name} has stopped."
+                vessel_event=event,
+                message=f"Alert: {vessel.vessel_name} has stopped."
             )

@@ -12,7 +12,8 @@ import {
   User,
   Ship,
   BarChart,
-  Shield
+  Shield,
+  Bell
 } from "lucide-react"
 
 import { logout } from "../../stores/slices/authSlice"
@@ -29,7 +30,9 @@ export default function Sidebar() {
   const role = user?.role || "viewer"
 
   const handleLogout = () => {
-    localStorage.removeItem("token")
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
+    localStorage.removeItem("user")
     dispatch(logout())
     navigate("/", { replace: true })
   }
@@ -47,6 +50,13 @@ export default function Sidebar() {
       to: "/vessels",
       icon: <Ship size={18} />,
       label: "Vessels",
+      roles: ["admin", "operator", "viewer"]
+    },
+
+    {
+      to: "/notifications",
+      icon: <Bell size={18} />,
+      label: "Notifications",
       roles: ["admin", "operator", "viewer"]
     },
 
@@ -164,7 +174,7 @@ export default function Sidebar() {
 
           Logged in as:
           <div className="text-white font-semibold">
-            {user.name}
+            {user?.username || user?.email || "User"}
           </div>
 
           <div className="capitalize">
