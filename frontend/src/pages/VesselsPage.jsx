@@ -1,180 +1,141 @@
-import { useEffect, useState, useMemo } from "react"
-import vesselService from "../services/vesselService"
+import React, { useMemo, useState, useEffect } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
+import api from "../api/axios"
+import VesselList from "../components/vessels/VesselList"
+import { Search, Ship } from "lucide-react"
 
 export default function VesselsPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const state = location.state || {}
+  const initialSelectedVesselId = state?.selectedVesselId || null
+
   const [vessels, setVessels] = useState([])
-  const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [query, setQuery] = useState("")
+  const [typeFilter, setTypeFilter] = useState("ALL")
+  const [selectedVesselId, setSelectedVesselId] = useState(initialSelectedVesselId)
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    Promise.all([
-      vesselService.getVessels().then((r) => r.data),
-      vesselService.getSafetyAlerts().then((r) => r.data).catch(() => []),
-    ])
-      .then(([data, alertsData]) => {
-        setVessels(Array.isArray(data) ? data : [])
-        setAlerts(Array.isArray(alertsData) ? alertsData : [])
-      })
-      .catch((err) => {
-        console.error("Failed to fetch vessels", err)
-        setError("Unable to load vessels from backend.")
-      })
-      .finally(() => setLoading(false))
+    const fetchVessels = async () => {
+      try {
+        const response = await api.get("/vessels/")
+        setVessels(response.data)
+      } catch (err) {
+        console.error("Failed to fetch vessels", err?.response?.data || err.message)
+        setError("Failed to fetch vessels")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchVessels()
   }, [])
 
-  const dangerSet = useMemo(
-    () => new Set(alerts.map((a) => (a.vessel || "").toLowerCase())),
-    [alerts]
+  const vesselRows = useMemo(
+    () =>
+      vessels.map((v) => ({
+        id: v.id,
+        imo: v.imo_number,
+        name: v.vessel_name,
+        type: v.vessel_type,
+        flag: v.flag,
+      })),
+    [vessels],
   )
 
+  const typeOptions = useMemo(() => {
+    const set = new Set(vesselRows.map((v) => v.type).filter(Boolean))
+    return ["ALL", ...Array.from(set).sort()]
+  }, [vesselRows])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return vesselRows.filter((v) => {
+      const matchesType = typeFilter === "ALL" || v.type === typeFilter
+      const matchesQuery =
+        !q ||
+        v.name?.toLowerCase().includes(q) ||
+        v.imo?.toLowerCase().includes(q) ||
+        v.flag?.toLowerCase().includes(q)
+      return matchesType && matchesQuery
+    })
+  }, [vesselRows, query, typeFilter])
+
+  const handleSelectVessel = (v) => {
+    setSelectedVesselId(v.id)
+    navigate(`/vessels/${v.id}`, {
+      state: {
+        selectedVesselId: v.id,
+      },
+    })
+  }
+
   return (
-
-    <div className="space-y-6 max-w-6xl mx-auto">
-
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          <span className="text-blue-700">Vessels</span> Overview
-        </h1>
-        <p className="text-sm text-slate-600 mt-1">
-          Live list of vessels coming from the backend `vessels` service.
-        </p>
+    <div className="page-shell">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="page-title">Vessels</h1>
+          <p className="page-subtitle">
+            Search, filter, and review vessel metadata from the tracking engine.
+          </p>
+        </div>
+        <span className="pill">
+          <Ship size={14} />
+          {vesselRows.length} total
+        </span>
       </div>
 
-      {loading && (
-        <p className="text-slate-500">
-          Loading vessels...
-        </p>
-      )}
+      <div className="card">
+        <div className="card-body">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 mb-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by name, IMO, or flag…"
+                  className="w-full rounded-xl border border-emerald-900/70 bg-emerald-950/70 px-9 py-2.5 text-sm text-emerald-50 placeholder:text-emerald-300/70 focus:outline-none focus:ring-2 focus:ring-emerald-600/60"
+                />
+              </div>
+            </div>
 
-      {error && !loading && (
-        <p className="text-red-600">
-          {error}
-        </p>
-      )}
-
-      {!loading && !error && vessels.length === 0 && (
-        <p className="text-slate-500">
-          No vessels found.
-        </p>
-      )}
-
-      {!loading && !error && vessels.length > 0 && (
-        <div className="bg-white rounded-2xl shadow border border-slate-200 overflow-hidden">
-
-          <div className="w-full overflow-x-auto px-4 pb-4">
-            <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-x-4">
-              <colgroup>
-                <col className="w-[16%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
-                <col className="w-[10%]" />
-                <col className="w-[14%]" />
-                <col className="w-[10%]" />
-                <col className="w-[14%]" />
-              </colgroup>
-
-              <thead className="bg-slate-900 text-white">
-
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Vessel Name
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    MMSI
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    IMO
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Flag
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Position
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Speed (kn)
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Status
-                  </th>
-                </tr>
-
-              </thead>
-
-              <tbody className="divide-y divide-slate-200">
-
-                {vessels.map((vessel, idx) => (
-
-                  <tr
-                    key={vessel.id || vessel.mmsi || idx}
-                    className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                  >
-
-                    <td className="px-6 py-4 text-base font-semibold text-slate-900 whitespace-nowrap">
-                      {vessel.vessel_name}
-                    </td>
-
-                    <td className="px-6 py-4 text-base font-mono text-slate-700 whitespace-nowrap">
-                      {vessel.mmsi}
-                    </td>
-
-                    <td className="px-6 py-4 text-base font-mono text-slate-700 whitespace-nowrap">
-                      {vessel.imo_number}
-                    </td>
-
-                    <td className="px-6 py-4 text-base text-slate-700 whitespace-nowrap">
-                      {vessel.vessel_type || "-"}
-                    </td>
-
-                    <td className="px-6 py-4 text-base text-slate-700 whitespace-nowrap">
-                      {vessel.flag || "-"}
-                    </td>
-
-                    <td className="px-6 py-4 text-base text-slate-700 whitespace-nowrap">
-                      {vessel.latitude?.toFixed
-                        ? vessel.latitude.toFixed(3)
-                        : vessel.latitude}
-                      {" / "}
-                      {vessel.longitude?.toFixed
-                        ? vessel.longitude.toFixed(3)
-                        : vessel.longitude}
-                    </td>
-
-                    <td className="px-6 py-4 text-base text-slate-700 whitespace-nowrap">
-                      {vessel.speed != null ? vessel.speed : "-"}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {dangerSet.has((vessel.vessel_name || "").toLowerCase()) ? (
-                        <span className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700">
-                          DANGER
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700">
-                          SAFE
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-
+            <div className="md:w-56">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="w-full rounded-xl border border-emerald-900/70 bg-emerald-950/70 px-3 py-2.5 text-sm text-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600/60"
+              >
+                {typeOptions.map((t) => (
+                  <option key={t} value={t}>
+                    {t === "ALL" ? "All vessel types" : t}
+                  </option>
                 ))}
-
-              </tbody>
-
-            </table>
+              </select>
+            </div>
           </div>
 
+          {loading && (
+            <div className="text-sm text-emerald-100/80">Loading vessels…</div>
+          )}
+          {error && !loading && (
+            <div className="text-sm text-red-400">{error}</div>
+          )}
+          {!loading && !error && (
+            <VesselList
+              vessels={filtered}
+              selectedVesselId={selectedVesselId}
+              onSelectVessel={handleSelectVessel}
+            />
+          )}
         </div>
-      )}
-
+      </div>
     </div>
   )
 }
-

@@ -2,10 +2,10 @@ import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useDispatch } from "react-redux"
-import { loginStart, loginSuccess, loginFailure } from "../stores/slices/authSlice"
+import { loginSuccess } from "../stores/slices/authSlice"
 import ReCAPTCHA from "react-google-recaptcha"
 import api from "../api/axios"
-import authService from "../services/authService"
+
 
 export default function LoginPage() {
 
@@ -14,6 +14,7 @@ export default function LoginPage() {
 
   const [isSignup, setIsSignup] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
+  const [isResetStep2, setIsResetStep2] = useState(false)
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -23,8 +24,8 @@ export default function LoginPage() {
   const [captchaValue, setCaptchaValue] = useState(null)
 
   const [form, setForm] = useState({
-    username: "",
     email: "",
+    username: "",
     password: "",
     confirmPassword: "",
     role: "operator"
@@ -50,6 +51,8 @@ export default function LoginPage() {
     setError("")
     setMessage("")
 
+    const users = JSON.parse(localStorage.getItem("users")) || []
+
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters")
       return
@@ -58,30 +61,56 @@ export default function LoginPage() {
     // ================= SIGNUP =================
     if (isSignup) {
 
+      if (!form.username) {
+        setError("Username is required")
+        return
+      }
+
+      if (!form.email) {
+        setError("Email is required")
+        return
+      }
+
       if (form.password !== form.confirmPassword) {
         setError("Passwords do not match")
         return
       }
 
       try {
-        // Use email as username in backend
-        await api.post("auth/register/", {
-          username: form.email,
+        const response = await api.post("/auth/register/", {
+          email: form.email,
+          username: form.username,
           password: form.password,
-          role: form.role
+          role: form.role,
         })
 
-        setMessage("Signup successful. You can now sign in.")
+        // Try to surface backend success message if any
+        const backendMessage =
+          response.data?.message || "Signup Successful ✅"
+        setMessage(backendMessage)
         setIsSignup(false)
-        return
-
       } catch (err) {
-        setError(
-          err.response?.data?.detail ||
-          "Signup failed. Please try again."
-        )
-        return
+        // Try to pull a helpful message from DRF response
+        const data = err.response?.data
+        let msg = ""
+
+        if (data && typeof data === "object") {
+          const firstKey = Object.keys(data)[0]
+          const value = data[firstKey]
+          if (Array.isArray(value)) {
+            msg = value[0]
+          } else if (typeof value === "string") {
+            msg = value
+          } else if (typeof data.message === "string") {
+            msg = data.message
+          } else if (typeof data.detail === "string") {
+            msg = data.detail
+          }
+        }
+
+        setError(msg || "Signup failed")
       }
+      return
     }
 
     // ================= CAPTCHA CHECK =================
@@ -92,59 +121,65 @@ export default function LoginPage() {
 
     // ================= LOGIN =================
     try {
-      dispatch(loginStart())
-
-      // Backend expects username; we use email as username
-      const loginResponse = await api.post("auth/login/", {
-        username: form.email,
-        password: form.password
+      const response = await api.post("/auth/login/", {
+        username: form.username,
+        password: form.password,
       })
 
-      const { access, refresh } = loginResponse.data
+      const tokens = response.data?.data?.tokens
+      const userData = response.data?.data?.user
 
-      // Persist tokens
-      localStorage.setItem("access_token", access)
-      localStorage.setItem("refresh_token", refresh)
+      if (!tokens?.access || !tokens?.refresh) {
+        setError("Login response missing tokens")
+        return
+      }
 
-      // Fetch profile from backend
-      const user = await authService.getProfile()
+      localStorage.setItem(import.meta.env.VITE_JWT_TOKEN_KEY, tokens.access)
+      localStorage.setItem(import.meta.env.VITE_REFRESH_TOKEN_KEY, tokens.refresh)
 
       dispatch(
         loginSuccess({
-          user,
-          token: access
-        })
+          user: userData || { username: form.username },
+          token: tokens.access,
+        }),
       )
 
       navigate("/dashboard")
-
     } catch (err) {
-      dispatch(
-        loginFailure(
-          err.response?.data?.error ||
-          err.response?.data?.detail ||
-          "Login failed"
-        )
-      )
-
-      setError(
-        err.response?.data?.error ||
-        "Invalid email or password"
-      )
+      const backendMessage =
+        err.response?.data?.message || err.response?.data?.detail
+      setError(backendMessage || "Login failed")
     }
   }
 
   // ================= FORGOT PASSWORD =================
-  const handleResetPassword = (e) => {
+  const handleCheckEmail = async (e) => {
     e.preventDefault()
     setError("")
     setMessage("")
 
-    const users = JSON.parse(localStorage.getItem("users")) || []
-    const userIndex = users.findIndex(u => u.email === resetEmail)
+    if (!resetEmail) {
+      setError("Email is required")
+      return
+    }
 
-    if (userIndex === -1) {
-      setError("Email not found")
+    try {
+      await api.post("/auth/check-email/", { email: resetEmail })
+      setIsResetStep2(true)
+      setError("")
+      setMessage("")
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.detail || "Email not registered")
+    }
+  }
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault()
+    setError("")
+    setMessage("")
+
+    if (!resetEmail) {
+      setError("Email is required")
       return
     }
 
@@ -158,11 +193,21 @@ export default function LoginPage() {
       return
     }
 
-    users[userIndex].password = resetPassword
-    localStorage.setItem("users", JSON.stringify(users))
+    try {
+      const response = await api.post("/auth/reset-password/", {
+        email: resetEmail,
+        new_password: resetPassword
+      })
 
-    setMessage("Password reset successful ✅")
-    setIsForgotPassword(false)
+      setMessage(response.data?.message || "Password reset successful ✅")
+      setIsForgotPassword(false)
+      setIsResetStep2(false)
+      setResetPassword("")
+      setResetConfirmPassword("")
+      setResetEmail("")
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.detail || "Failed to reset password")
+    }
   }
 
   return (
@@ -191,10 +236,10 @@ export default function LoginPage() {
 
             {isSignup && (
               <input
-                type="text"
-                name="username"
-                placeholder="Enter Username"
-                value={form.username}
+                type="email"
+                name="email"
+                placeholder="Enter Email Address"
+                value={form.email}
                 onChange={handleChange}
                 required
                 className="input"
@@ -202,10 +247,10 @@ export default function LoginPage() {
             )}
 
             <input
-              type="email"
-              name="email"
-              placeholder="Enter Email"
-              value={form.email}
+              type="text"
+              name="username"
+              placeholder={isSignup ? "Enter Username" : "Email or Username"}
+              value={form.username}
               onChange={handleChange}
               required
               className="input"
@@ -242,18 +287,18 @@ export default function LoginPage() {
                 />
               </div>
             )}
-{isSignup && (
-  <select
-    name="role"
-    value={form.role}
-    onChange={handleChange}
-    className="input"
-  >
-    <option value="operator">Operator</option>
-    <option value="admin">Admin</option>
-    <option value="Viewer">Viewer</option>
-  </select>
-)}
+            {isSignup && (
+              <select
+                name="role"
+                value={form.role}
+                onChange={handleChange}
+                className="input"
+              >
+                <option value="operator" className="text-black bg-white">Operator</option>
+                <option value="analyst" className="text-black bg-white">Analyst</option>
+                <option value="admin" className="text-black bg-white">Admin</option>
+              </select>
+            )}
             {!isSignup && (
               <>
                 <div className="flex justify-center mt-3">
@@ -293,42 +338,73 @@ export default function LoginPage() {
 
         ) : (
 
-          <form onSubmit={handleResetPassword}>
+          <form onSubmit={isResetStep2 ? handleResetPassword : handleCheckEmail}>
 
-            <input
-              type="email"
-              placeholder="Enter Registered Email"
-              value={resetEmail}
-              onChange={(e) => setResetEmail(e.target.value)}
-              required
-              className="input"
-            />
+            {!isResetStep2 ? (
+              <>
+                <input
+                  type="email"
+                  placeholder="Enter Registered Email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  className="input"
+                />
 
-            <input
-              type="password"
-              placeholder="New Password"
-              value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
-              required
-              className="input"
-            />
+                {error && <p className="text-red-400 mt-2">{error}</p>}
+                {message && <p className="text-green-400 mt-2">{message}</p>}
 
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={resetConfirmPassword}
-              onChange={(e) => setResetConfirmPassword(e.target.value)}
-              required
-              className="input"
-            />
+                <button className="login-btn w-full mt-4">
+                  Verify Email
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  disabled
+                  className="input opacity-70 cursor-not-allowed bg-slate-100 text-slate-500"
+                />
 
-            <button className="login-btn w-full mt-4">
-              Reset Password
-            </button>
+                <input
+                  type="password"
+                  placeholder="New Password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  required
+                  className="input"
+                />
+
+                <input
+                  type="password"
+                  placeholder="Confirm New Password"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  required
+                  className="input"
+                />
+
+                {error && <p className="text-red-400 mt-2">{error}</p>}
+                {message && <p className="text-green-400 mt-2">{message}</p>}
+
+                <button className="login-btn w-full mt-4">
+                  Reset Password
+                </button>
+              </>
+            )}
 
             <p
               className="text-blue-400 text-sm mt-3 cursor-pointer text-center"
-              onClick={() => setIsForgotPassword(false)}
+              onClick={() => {
+                setIsForgotPassword(false)
+                setIsResetStep2(false)
+                setResetPassword("")
+                setResetConfirmPassword("")
+                setResetEmail("")
+                setError("")
+                setMessage("")
+              }}
             >
               Back to Login
             </p>

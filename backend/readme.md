@@ -47,35 +47,8 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your configuration
 
-# Optional: run migrations and create superuser
-python manage.py migrate
-python manage.py createsuperuser
 
-# Manual vessel update (scheduler also runs every 2 min)
-python manage.py fetch_vessels
-
-## API Endpoints (current implementation)
-
-All vessel/notification/safety/analytics endpoints require JWT: `Authorization: Bearer <access_token>`.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/vessels/` | List vessels (filter: `?vessel_type=`, `?flag=`, `?cargo_type=`) |
-| GET | `/api/vessels/<id>/` | Vessel detail |
-| POST | `/api/vessels/<id>/subscribe/` | Subscribe to vessel |
-| DELETE | `/api/vessels/<id>/unsubscribe/` | Unsubscribe from vessel |
-| GET | `/api/vessels/events/` | List vessel events |
-| GET | `/api/vessels/notifications/` | List current user's notifications |
-| PATCH | `/api/vessels/notifications/<id>/mark-read/` | Mark notification as read |
-| POST | `/api/vessels/detect-events/` | Trigger event detection run |
-| GET | `/api/vessels/ports/analytics/` | Port congestion analytics |
-| GET | `/api/vessels/safety/zones/` | List safety zones |
-| GET | `/api/vessels/safety/alerts/` | Safety risk alerts |
-| POST | `/api/auth/login/` | Login (returns `access`, `refresh`) |
-| POST | `/api/auth/register/` | Register (`username`, `password`, `role`) |
-| GET | `/api/auth/profile/` | Current user profile |
-
-## Project Structure
+Project Structure
 
 backend/
 ├── manage.py

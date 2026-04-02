@@ -1,37 +1,40 @@
-import math
-from vessels.models import Vessel
+from math import radians, cos, sin, asin, sqrt
+from ..models import SafetyZone, Notification
 
 
-class SafetyDetectionService:
+def calculate_distance(lat1, lon1, lat2, lon2):
 
-    def calculate_distance(self, lat1, lon1, lat2, lon2):
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
 
-        return math.sqrt((lat1 - lat2) ** 2 + (lon1 - lon2) ** 2)
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+
+    r = 6371  # Earth radius km
+    return c * r
 
 
-    def detect_risks(self, zones):
+def detect_safety_violations(vessel):
 
-        alerts = []
+    zones = SafetyZone.objects.all()
 
-        vessels = Vessel.objects.all()
+    for zone in zones:
 
-        for vessel in vessels:
+        distance = calculate_distance(
+            vessel.latitude,
+            vessel.longitude,
+            zone.latitude,
+            zone.longitude
+        )
 
-            for zone in zones:
+        if distance <= zone.radius_km:
 
-                distance = self.calculate_distance(
-                    vessel.latitude,
-                    vessel.longitude,
-                    zone["lat"],
-                    zone["lon"]
-                )
+            Notification.objects.create(
+                message=f"{vessel.vessel_name} entered danger zone: {zone.name}"
+            )
 
-                if distance <= zone["radius"]:
+            return "DANGER"
 
-                    alerts.append({
-                        "vessel": vessel.vessel_name,
-                        "risk": zone["type"],
-                        "severity": "High"
-                    })
-
-        return alerts
+    return "SAFE"

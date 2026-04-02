@@ -1,14 +1,29 @@
-from vessels.models import VesselSubscription, Notification
+from vessels.models import Notification
 
 
-def create_notifications(vessel, events):
-    """Create notifications for subscribers when vessel events occur."""
-    subscribers = VesselSubscription.objects.filter(vessel=vessel)
+def create_notification(message):
 
-    for subscription in subscribers:
-        for event in events:
-            Notification.objects.create(
-                user=subscription.user,
-                vessel_event=event,
-                message=f"{vessel.vessel_name}: {event.description}"
-            )
+    notification = Notification.objects.create(
+        message=message
+    )
+
+    return {
+        "notification_id": notification.id,
+        "message": notification.message
+    }
+
+
+def get_all_notifications():
+
+    notifications = Notification.objects.all().order_by("-created_at")
+
+    data = []
+
+    for n in notifications:
+        data.append({
+            "id": n.id,
+            "message": n.message,
+            "time": n.created_at
+        })
+
+    return data

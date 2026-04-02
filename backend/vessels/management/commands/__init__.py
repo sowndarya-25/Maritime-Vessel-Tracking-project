@@ -1,1 +1,1 @@
-
+# Initialize commands command

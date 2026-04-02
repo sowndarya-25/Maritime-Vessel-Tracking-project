@@ -1,105 +1,106 @@
 import { useEffect, useState } from "react"
+import api from "../api/axios"
+import { Users as UsersIcon } from "lucide-react"
 
 export default function UsersPage() {
 
   const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
 
-    const storedUsers =
-      JSON.parse(localStorage.getItem("users")) || []
+    const fetchUsers = async () => {
+      try {
+        const response = await api.get("/auth/users/")
+        setUsers(response.data)
+      } catch (err) {
+        console.error("Failed to load users", err)
+        setError("Failed to load users")
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    setUsers(storedUsers)
+    fetchUsers()
 
   }, [])
 
   return (
 
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="page-shell">
 
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          <span className="text-blue-700">Users</span> Management
-        </h1>
-        <p className="text-sm text-slate-600 mt-1">
-          Manage registered users and their roles.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="page-title">Users</h1>
+          <p className="page-subtitle">
+            Admin-only user directory for roles and access management.
+          </p>
+        </div>
+        <span className="pill border-slate-200 text-slate-700 bg-white">
+          <UsersIcon size={14} />
+          {users.length} users
+        </span>
       </div>
 
-      {users.length === 0 ? (
+      {loading && (
+        <div className="text-sm text-slate-600">
+          Loading users…
+        </div>
+      )}
 
-        <p className="text-slate-500">
+      {error && !loading && (
+        <div className="text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && users.length === 0 && (
+        <div className="text-sm text-slate-600">
           No users found
-        </p>
+        </div>
+      )}
 
-      ) : (
+      {!loading && !error && users.length > 0 && (
 
-        <div className="bg-white rounded-2xl shadow border border-slate-200 overflow-hidden">
-
-          <div className="w-full overflow-x-auto px-4 pb-4">
-            <table className="w-full min-w-[800px] table-fixed border-separate border-spacing-x-4">
-              <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[18%]" />
-                <col className="w-[45%]" />
-                <col className="w-[15%]" />
-              </colgroup>
-
-              <thead className="bg-slate-900 text-white">
-
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Username
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider whitespace-nowrap">
-                    Role
-                  </th>
-                </tr>
-
-              </thead>
-
-              <tbody className="divide-y divide-slate-200">
-
-                {users.map((user, idx) => (
-
-                  <tr
-                    key={user.id}
-                    className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}
-                  >
-
-                    <td className="px-6 py-4 text-base font-mono text-slate-700 whitespace-nowrap">
-                      {user.id}
-                    </td>
-
-                    <td className="px-6 py-4 text-base font-semibold text-slate-900 whitespace-nowrap">
-                      {user.username}
-                    </td>
-
-                    <td className="px-6 py-4 text-base text-slate-700 break-all">
-                      {user.email}
-                    </td>
-
-                    <td className="px-6 py-4 text-base text-center">
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 ring-1 ring-inset ring-blue-200 capitalize">
-                        {user.role}
-                      </span>
-                    </td>
-
+        <div className="card">
+          <div className="card-body">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                    <th className="py-3 pr-4">ID</th>
+                    <th className="py-3 pr-4">Username</th>
+                    <th className="py-3 pr-4">Email</th>
+                    <th className="py-3 pr-4">Role</th>
                   </tr>
-
-                ))}
-
-              </tbody>
-
-            </table>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="border-b border-slate-100 hover:bg-slate-50 transition"
+                    >
+                      <td className="py-3 pr-4 font-mono text-sm text-slate-700">
+                        {user.id}
+                      </td>
+                      <td className="py-3 pr-4 font-medium text-slate-900">
+                        {user.username}
+                      </td>
+                      <td className="py-3 pr-4 text-sm text-slate-700">
+                        {user.email || "-"}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className="pill border-slate-200 bg-white text-slate-700 capitalize">
+                          {user.role}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-
         </div>
 
       )}

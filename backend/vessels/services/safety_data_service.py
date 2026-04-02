@@ -1,24 +1,23 @@
-class SafetyDataService:
+def fetch_port_data():
 
-    def fetch_safety_zones(self):
-        """
-        Simulated storm / cyclone zones.
-        Later this will fetch NOAA weather data.
-        """
+    # Demo port data for congestion analytics
 
-        zones = [
-            {
-                "type": "Storm",
-                "lat": 18.4,
-                "lon": 72.2,
-                "radius": 5
-            },
-            {
-                "type": "Cyclone",
-                "lat": 16.0,
-                "lon": 70.5,
-                "radius": 6
-            }
-        ]
+    ports = [
+        {
+            "port_name": "Singapore",
+            "vessels_in_port": 45,
+            "capacity": 60
+        },
+        {
+            "port_name": "Dubai",
+            "vessels_in_port": 30,
+            "capacity": 40
+        },
+        {
+            "port_name": "Rotterdam",
+            "vessels_in_port": 70,
+            "capacity": 80
+        }
+    ]
 
-        return zones
+    return ports

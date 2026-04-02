@@ -1,28 +1,32 @@
-class PortDataService:
+def fetch_port_data():
+    """
+    Temporary demo data for port congestion analytics.
+    Later this can be replaced with real API data.
+    """
 
-    def fetch_port_data(self):
-        """
-        Fetch port arrival/departure statistics.
-        For now we simulate data.
-        Later this will call UNCTAD API.
-        """
+    ports = [
+        {
+            "port_name": "Singapore",
+            "arrivals": 120,
+            "departures": 115,
+            "capacity": 60,
+        },
+        {
+            "port_name": "Dubai",
+            "arrivals": 95,
+            "departures": 88,
+            "capacity": 50,
+        },
+        {
+            "port_name": "Rotterdam",
+            "arrivals": 160,
+            "departures": 140,
+            "capacity": 90,
+        },
+    ]
 
-        port_data = [
-            {
-                "port": "Singapore",
-                "arrivals": 120,
-                "departures": 115
-            },
-            {
-                "port": "Rotterdam",
-                "arrivals": 95,
-                "departures": 90
-            },
-            {
-                "port": "Dubai",
-                "arrivals": 140,
-                "departures": 130
-            }
-        ]
+    # Backward compatible alias used by existing congestion logic.
+    for p in ports:
+        p["vessels_in_port"] = p["arrivals"] - p["departures"]
 
-        return port_data
+    return ports
